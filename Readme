@@ -12,3 +12,6 @@
    * outputFile is a maximal linearizable history prefix
 
 5. The replay.sh calls Replay to check if a sequential or sequentialized history is correct.
+
+remarks:
+64线程，50列车，20个车厢，每个车厢100个座位，30个站，每个线程100万条操作。买票30%，退票10%，查票60%。如果时间来不及，也可能是每个线程10万条操作。
