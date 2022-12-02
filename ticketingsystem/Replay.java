@@ -168,7 +168,10 @@ public class Replay{
 	  if((flag && line.res.equals("true")) || (!flag && line.res.equals("false")))
 		return true;
 	  else {
+		System.out.println(flag);
+		System.out.println("line.res: " + line.res);
 		System.out.println("Error: Ticket is refunded" + " " + line.pretime + " " + line.posttime + " " + line.threadid + " " + ticket.tid + " " + ticket.passenger + " " + ticket.route + " " + ticket.coach  + " " + ticket.departure + " " + ticket.arrival + " " + ticket.seat);
+		System.out.println("Actual Ticket: " + ticket.tid + " " + ticket.passenger);
 		return false;
 	  }
 	}
@@ -205,7 +208,7 @@ public class Replay{
 	HistoryLine tl = historyList.get(line);
 	System.out.println(tl.pretime + " " + tl.posttime + " " + tl.threadid + " " + tl.operationName + " " + tl.tid + " " + tl.passenger + " " + tl.route + " " + tl.coach  + " " + tl.departure + " " + tl.arrival + " " + tl.seat);
   }
-  private static boolean readHistory(ArrayList<HistoryLine> historyList, String filename) {
+  public static boolean readHistory(ArrayList<HistoryLine> historyList, String filename) {
 	try {
 	  Scanner scanner = new Scanner(new File(filename));
 	  int i = 0;
