@@ -9,7 +9,7 @@ import sun.misc.Unsafe;
 
 public class TicketingDS implements TicketingSystem {
 
-	@sun.misc.Contended
+	// @sun.misc.Contended
 	static final class ContendedCell {
 		long value;
 		long pad1, pad2, pad3, pad4, pad5, pad6, pad7;
@@ -62,7 +62,7 @@ public class TicketingDS implements TicketingSystem {
 	}
 
 	// 2PL
-	@sun.misc.Contended
+	// @sun.misc.Contended
 	static final class LockedCell {
 		final StampedLock rwlock = new StampedLock();
 		final ConcurrentHashMap<TicketSale, Object> ticketsOnSale = new ConcurrentHashMap<>(10);
