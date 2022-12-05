@@ -196,6 +196,7 @@ public class Test {
 						metrics2.inquiryLatency.report(System.nanoTime() - startTime);
 					}
 				}
+				System.out.println("t" + Thread.currentThread().getId() + " done");
 			});
 			threads[i].start();
 		}

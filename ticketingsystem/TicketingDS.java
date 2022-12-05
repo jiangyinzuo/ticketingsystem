@@ -151,13 +151,13 @@ public class TicketingDS implements TicketingSystem {
 						result = soldBits.compareAndSet(origin, updated);
 					} while (!result);
 
-					rangeSeatNums[departure][arrival].soldTickets.put(newTicketSale, new Object());
 					oldCell.rwlock.unlockWrite(oldwt);
 					for (int i = 0; i < wts.length; ++i) {
 						if (wts[i] > 0) {
 							cells[i].rwlock.unlockWrite(wts[i]);
 						}
 					}
+					rangeSeatNums[departure][arrival].soldTickets.put(newTicketSale, new Object());
 
 					return newTicketSale;
 				} else {
@@ -226,9 +226,9 @@ public class TicketingDS implements TicketingSystem {
 
 		int queryCoachSeatNum(int departure, int arrival) {
 			int sum = 0;
-			Lock[] readlocks = new Lock[departure * (stationnum - arrival + 1)];
+			final Lock[] readlocks = new Lock[departure * (stationnum - arrival + 1)];
 
-			int i = 0;
+			int lockCount = 0;
 			for (int left = 1; left <= departure; ++left) {
 				for (int right = stationnum; right >= arrival; --right) {
 					LockedCell cell = rangeSeatNums[left][right];
@@ -237,18 +237,16 @@ public class TicketingDS implements TicketingSystem {
 					if (cell.rwlock.validate(rt)) {
 						sum += sz;
 					} else {
-						readlocks[i] = cell.rwlock.asReadLock();
-						readlocks[i].lock();
+						readlocks[lockCount] = cell.rwlock.asReadLock();
+						readlocks[lockCount].lock();
 						sum += cell.ticketsOnSale.size();
+						++lockCount;
 					}
-					++i;
 				}
 			}
 
-			for (Lock lock : readlocks) {
-				if (lock != null) {
-					lock.unlock();
-				}
+			for (int i = 0; i < lockCount; ++i) {
+				readlocks[i].unlock();
 			}
 			assert sum <= coachnum * seatnum;
 			return sum;
