@@ -1,4 +1,4 @@
 #!/bin/sh
 
 javac -encoding UTF-8 -cp . ticketingsystem/Test.java
-java -XX:-RestrictContended -cp . ticketingsystem/Test
+java -cp . ticketingsystem/Test 64 100000

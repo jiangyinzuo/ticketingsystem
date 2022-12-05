@@ -84,13 +84,13 @@ class Latency {
 	@Override
 	public String toString() {
 		return "count: " + count
-				+ ", avg latency: " + laplaceSmooth(latenciesSum, count)
+				+ ", avg latency: " + laplaceSmooth(latenciesSum / 1000000, count) + " ms"
 				+ ", max latency: " + maxLatency
 				+ ", min latency: " + minLatency
-				+ ", QPS: " + laplaceSmooth(count, latenciesSum);
+				+ ", QPS: " + laplaceSmooth(count, latenciesSum / 1000000) + " ops/ms";
 	}
 
-	private double laplaceSmooth(long a, long b) {
+	private double laplaceSmooth(double a, double b) {
 		return b == 0 ? a + 1 : a / b;
 	}
 }
@@ -127,8 +127,10 @@ public class Test {
 			System.out.println("args: <threadnum> <testnum>");
 			return;
 		}
+		long st = System.currentTimeMillis();
 		final int threadnum = Integer.parseInt(args[0]);
 		final int testnum = Integer.parseInt(args[1]);
+		System.out.println("threadnum: " + threadnum + ", testnum: " + testnum);
 		ConfigReader.readConfig("TrainConfig");
 
 		final TicketingDS ds = new TicketingDS(ConfigReader.routenum, ConfigReader.coachnum, ConfigReader.seatnum,
@@ -153,11 +155,13 @@ public class Test {
 					if (randvalue < ConfigReader.refRatio && !tickets.isEmpty()) {
 						// refund
 						Ticket ticket = tickets.iterator().next();
+						assert ticket != null;
+						tickets.remove(ticket);
 						final long startTime = System.nanoTime();
 						boolean result = ds.refundTicket(ticket);
 						metrics2.refundLatency.report(System.nanoTime() - startTime);
 						if (!result) {
-							System.out.println("[ERROR] refund returnes false");
+							System.out.println("[ERROR] refund returns false. ticket: " + ticket);
 							return;
 						}
 					} else if (randvalue < ConfigReader.refRatio + ConfigReader.buyRatio) {
@@ -189,11 +193,13 @@ public class Test {
 					}
 				}
 			});
+			threads[i].start();
 		}
 		for (Thread t : threads) {
 			t.join();
 		}
 		Metrics reduced = Stream.of(metrics).reduce(new Metrics(), Metrics::reduce);
 		System.out.println(reduced);
+		System.out.println("time: " + (System.currentTimeMillis() - st) / 1000.0 + "s");
 	}
 }

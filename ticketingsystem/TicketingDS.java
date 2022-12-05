@@ -1,6 +1,7 @@
 package ticketingsystem;
 
 import java.lang.reflect.Field;
+import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Lock;
@@ -65,8 +66,8 @@ public class TicketingDS implements TicketingSystem {
 	// @sun.misc.Contended
 	static final class LockedCell {
 		final StampedLock rwlock = new StampedLock();
-		final ConcurrentHashMap<TicketSale, Object> ticketsOnSale = new ConcurrentHashMap<>(10);
-		final ConcurrentHashMap<TicketSale, Object> soldTickets = new ConcurrentHashMap<>(10);
+		final HashSet<TicketSale> ticketsOnSale = new HashSet<>(100);
+		final ConcurrentHashMap<TicketSale, Object> soldTickets = new ConcurrentHashMap<>(100);
 	}
 
 	class RouteTickets {
@@ -93,7 +94,7 @@ public class TicketingDS implements TicketingSystem {
 			}
 			for (int coach = 1; coach <= coachnum; ++coach) {
 				for (int seat = 1; seat <= seatnum; ++seat) {
-					this.rangeSeatNums[1][stationnum].ticketsOnSale.put(new TicketSale(coach, seat), new Object());
+					this.rangeSeatNums[1][stationnum].ticketsOnSale.add(new TicketSale(coach, seat));
 					this.gapLocks[coach][seat] = new AtomicLong(0);
 				}
 			}
@@ -126,7 +127,7 @@ public class TicketingDS implements TicketingSystem {
 						// sleep0();
 						// continue;
 					// }
-					TicketSale oldTicketOnSale = oldCell.ticketsOnSale.keySet().iterator().next();
+					TicketSale oldTicketOnSale = oldCell.ticketsOnSale.iterator().next();
 					oldCell.ticketsOnSale.remove(oldTicketOnSale);
 					LockedCell[] cells = { rangeSeatNums[left][departure],
 							rangeSeatNums[arrival][right] };
@@ -135,11 +136,11 @@ public class TicketingDS implements TicketingSystem {
 					TicketSale newTicketSale = new TicketSale(genTid(), passenger, oldTicketOnSale.coach, oldTicketOnSale.seat);
 					if (left < departure) {
 						wts[0] = cells[0].rwlock.writeLock();
-						cells[0].ticketsOnSale.put(new TicketSale(oldTicketOnSale.coach, oldTicketOnSale.seat), new Object());
+						cells[0].ticketsOnSale.add(new TicketSale(oldTicketOnSale.coach, oldTicketOnSale.seat));
 					}
 					if (arrival < right) {
 						wts[1] = cells[1].rwlock.writeLock();
-						cells[1].ticketsOnSale.put(new TicketSale(oldTicketOnSale.coach, oldTicketOnSale.seat), new Object());
+						cells[1].ticketsOnSale.add(new TicketSale(oldTicketOnSale.coach, oldTicketOnSale.seat));
 					}
 
 					AtomicLong soldBits = this.gapLocks[newTicketSale.coach][newTicketSale.seat];
@@ -210,7 +211,7 @@ public class TicketingDS implements TicketingSystem {
 					if (ticket.arrival < right) {
 						cells[2].ticketsOnSale.remove(availablTicketSale);
 					}
-					cells[0].ticketsOnSale.put(availablTicketSale, new Object());
+					cells[0].ticketsOnSale.add(availablTicketSale);
 
 					while (!soldBits.compareAndSet(validate, validate & ~ticketBits)) {
 						validate = soldBits.get();
