@@ -335,7 +335,7 @@ class TicketingSystemTest {
 	}
 
 	@Test
-	void StampedLockTest() {
+	void StampedLockTest1() {
 		StampedLock lock = new StampedLock();
 		long t1 = lock.tryOptimisticRead();
 		long t2 = lock.writeLock();
@@ -362,5 +362,17 @@ class TicketingSystemTest {
 		lock.unlockRead(t2);
 		t3 = lock.tryConvertToWriteLock(t1);
 		assertTrue(t3 > 0);
+	}
+
+	@Test
+	void StampedLockTest2() {
+		StampedLock lock = new StampedLock();
+		long t2 = lock.writeLock();
+		long t1 = lock.tryOptimisticRead();
+		assertEquals(0, t1);
+		lock.unlockWrite(t2);
+
+		t1 = lock.tryOptimisticRead();
+		assertNotEquals(0, t1);
 	}
 }

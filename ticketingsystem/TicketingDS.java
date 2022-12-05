@@ -120,6 +120,10 @@ public class TicketingDS implements TicketingSystem {
 			LockedCell oldCell = rangeSeatNums[left][right];
 			for (;;) {
 				long rs = oldCell.rwlock.tryOptimisticRead();
+				if (rs == 0) {
+					sleep0();
+					continue;
+				}
 				if (!oldCell.ticketsOnSale.isEmpty()) {
 					long oldwt = oldCell.rwlock.tryConvertToWriteLock(rs);
 					if (oldwt == 0) {
@@ -233,15 +237,17 @@ public class TicketingDS implements TicketingSystem {
 				for (int right = stationnum; right >= arrival; --right) {
 					LockedCell cell = rangeSeatNums[left][right];
 					long rt = cell.rwlock.tryOptimisticRead();
-					int sz = cell.ticketsOnSale.size();
-					if (cell.rwlock.validate(rt)) {
-						sum += sz;
-					} else {
-						readlocks[lockCount] = cell.rwlock.asReadLock();
-						readlocks[lockCount].lock();
-						sum += cell.ticketsOnSale.size();
-						++lockCount;
+					if (rt > 0) {
+						int sz = cell.ticketsOnSale.size();
+						if (cell.rwlock.validate(rt)) {
+							sum += sz;
+							continue;
+						}
 					}
+					readlocks[lockCount] = cell.rwlock.asReadLock();
+					readlocks[lockCount].lock();
+					sum += cell.ticketsOnSale.size();
+					++lockCount;
 				}
 			}
 
