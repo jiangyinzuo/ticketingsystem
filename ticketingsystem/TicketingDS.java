@@ -119,14 +119,13 @@ public class TicketingDS implements TicketingSystem {
 		private TicketSale allocCoachSeatWithRange(String passenger, int departure, int arrival, int left, int right) {
 			LockedCell oldCell = rangeSeatNums[left][right];
 			for (;;) {
-				long rs = oldCell.rwlock.writeLock();
+				long rs = oldCell.rwlock.tryOptimisticRead();
 				if (!oldCell.ticketsOnSale.isEmpty()) {
-					// long oldwt = oldCell.rwlock.tryConvertToWriteLock(rs);
-					// if (oldwt == 0) {
-						// oldCell.rwlock.unlockRead(rs);
-						// sleep0();
-						// continue;
-					// }
+					long oldwt = oldCell.rwlock.tryConvertToWriteLock(rs);
+					if (oldwt == 0) {
+						sleep0();
+						continue;
+					}
 					TicketSale oldTicketOnSale = oldCell.ticketsOnSale.iterator().next();
 					oldCell.ticketsOnSale.remove(oldTicketOnSale);
 					LockedCell[] cells = { rangeSeatNums[left][departure],
@@ -144,7 +143,7 @@ public class TicketingDS implements TicketingSystem {
 					}
 
 					AtomicLong soldBits = this.gapLocks[newTicketSale.coach][newTicketSale.seat];
-					long bitvec = (2 << arrival) - (1 << (departure+1));
+					long bitvec = (2 << arrival) - (1 << (departure + 1));
 					boolean result;
 					do {
 						long origin = soldBits.get();
@@ -153,7 +152,7 @@ public class TicketingDS implements TicketingSystem {
 					} while (!result);
 
 					rangeSeatNums[departure][arrival].soldTickets.put(newTicketSale, new Object());
-					oldCell.rwlock.unlockWrite(rs);
+					oldCell.rwlock.unlockWrite(oldwt);
 					for (int i = 0; i < wts.length; ++i) {
 						if (wts[i] > 0) {
 							cells[i].rwlock.unlockWrite(wts[i]);
@@ -162,7 +161,6 @@ public class TicketingDS implements TicketingSystem {
 
 					return newTicketSale;
 				} else {
-					oldCell.rwlock.unlockWrite(rs);
 					return null;
 				}
 			}
@@ -177,7 +175,7 @@ public class TicketingDS implements TicketingSystem {
 			AtomicLong soldBits = this.gapLocks[ticket.coach][ticket.seat];
 			boolean end;
 			do {
-				long ticketBits = (2 << ticket.arrival) - (1 << (ticket.departure+1));
+				long ticketBits = (2 << ticket.arrival) - (1 << (ticket.departure + 1));
 				long origin = soldBits.get();
 				long update = origin ^ ticketBits;
 
@@ -202,7 +200,7 @@ public class TicketingDS implements TicketingSystem {
 				}
 
 				long validate = soldBits.get();
-				end = ((origin ^ validate) & ((2 << right) - (1 << (left+1)))) == 0;
+				end = ((origin ^ validate) & ((2 << right) - (1 << (left + 1)))) == 0;
 				if (end) {
 					TicketSale availablTicketSale = new TicketSale(ticket.coach, ticket.seat);
 					if (left < ticket.departure) {
@@ -234,22 +232,30 @@ public class TicketingDS implements TicketingSystem {
 			for (int left = 1; left <= departure; ++left) {
 				for (int right = stationnum; right >= arrival; --right) {
 					LockedCell cell = rangeSeatNums[left][right];
-					readlocks[i] = cell.rwlock.asReadLock();
-					readlocks[i].lock();
-					sum += cell.ticketsOnSale.size();
+					long rt = cell.rwlock.tryOptimisticRead();
+					int sz = cell.ticketsOnSale.size();
+					if (cell.rwlock.validate(rt)) {
+						sum += sz;
+					} else {
+						readlocks[i] = cell.rwlock.asReadLock();
+						readlocks[i].lock();
+						sum += cell.ticketsOnSale.size();
+					}
 					++i;
 				}
 			}
 
 			for (Lock lock : readlocks) {
-				lock.unlock();
+				if (lock != null) {
+					lock.unlock();
+				}
 			}
 			assert sum <= coachnum * seatnum;
 			return sum;
 		}
 	}
 
-	private static final int MAX_THREAD_NUM = 128;
+	private static final int MAX_THREAD_NUM = 512;
 	ContendedCell[] threadLocalCounterCell = new ContendedCell[MAX_THREAD_NUM];
 
 	private final int routenum;

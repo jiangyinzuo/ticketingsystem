@@ -7,6 +7,7 @@ import java.util.Random;
 import java.util.Scanner;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 
 class ConfigReader {
@@ -46,9 +47,9 @@ class ConfigReader {
 				refRatio = linescanner.nextInt();
 				buyRatio = linescanner.nextInt();
 				inqRatio = linescanner.nextInt();
-				// System.out.println("route: " + routenum + ", coach: " + coachnum + ",
-				// seatnum: " + seatnum + ", station: " + stationnum + ", refundRatio: " +
-				// refRatio + ", buyRatio: " + buyRatio + ", inquiryRatio: " + inqRatio);
+				System.out.println("route: " + routenum + ", coach: " + coachnum + ", seatnum: " + seatnum + ", station: "
+						+ stationnum + ", refundRatio: " +
+						refRatio + ", buyRatio: " + buyRatio + ", inquiryRatio: " + inqRatio);
 				linescanner.close();
 			}
 			scanner.close();
@@ -61,6 +62,7 @@ class ConfigReader {
 }
 
 class Latency {
+	static int threadnum = 1;
 	long latenciesSum = 0;
 	long maxLatency = 0;
 	long minLatency = Long.MAX_VALUE;
@@ -87,7 +89,7 @@ class Latency {
 				+ ", avg latency: " + laplaceSmooth(latenciesSum / 1000000, count) + " ms"
 				+ ", max latency: " + maxLatency
 				+ ", min latency: " + minLatency
-				+ ", QPS: " + laplaceSmooth(count, latenciesSum / 1000000) + " ops/ms";
+				+ ", QPS: " + laplaceSmooth(count, latenciesSum / 1000000) * threadnum + " ops/ms";
 	}
 
 	private double laplaceSmooth(double a, double b) {
@@ -127,25 +129,27 @@ public class Test {
 			System.out.println("args: <threadnum> <testnum>");
 			return;
 		}
-		long st = System.currentTimeMillis();
-		final int threadnum = Integer.parseInt(args[0]);
+		Latency.threadnum = Integer.parseInt(args[0]);
 		final int testnum = Integer.parseInt(args[1]);
-		System.out.println("threadnum: " + threadnum + ", testnum: " + testnum);
+		System.out.println("threadnum: " + Latency.threadnum + ", testnum: " + testnum);
 		ConfigReader.readConfig("TrainConfig");
 
 		final TicketingDS ds = new TicketingDS(ConfigReader.routenum, ConfigReader.coachnum, ConfigReader.seatnum,
-				ConfigReader.stationnum, threadnum);
+				ConfigReader.stationnum, Latency.threadnum);
 
-		Thread[] threads = new Thread[threadnum];
-		Metrics[] metrics = new Metrics[threadnum];
-		CyclicBarrier barrier = new CyclicBarrier(threadnum);
-		for (int i = 0; i < threadnum; ++i) {
+		Thread[] threads = new Thread[Latency.threadnum];
+		Metrics[] metrics = new Metrics[Latency.threadnum];
+		CyclicBarrier barrier = new CyclicBarrier(Latency.threadnum);
+
+		AtomicLong st = new AtomicLong(0);
+		for (int i = 0; i < Latency.threadnum; ++i) {
 			metrics[i] = new Metrics();
 			Metrics metrics2 = metrics[i];
 			threads[i] = new Thread(() -> {
 				final Random rand = new Random(Thread.currentThread().getId() * 1000000007L + System.currentTimeMillis());
 				final HashSet<Ticket> tickets = new HashSet<>(testnum * ConfigReader.buyRatio);
 				try {
+					st.set(System.nanoTime());
 					barrier.await();
 				} catch (InterruptedException | BrokenBarrierException e) {
 					e.printStackTrace();
@@ -198,8 +202,10 @@ public class Test {
 		for (Thread t : threads) {
 			t.join();
 		}
+		long endtime = System.nanoTime();
 		Metrics reduced = Stream.of(metrics).reduce(new Metrics(), Metrics::reduce);
 		System.out.println(reduced);
-		System.out.println("time: " + (System.currentTimeMillis() - st) / 1000.0 + "s");
+		System.out.println("time: " + (endtime - st.get()) / 1000_000_000.0 + "s");
+		System.out.println("client QPS: " + Latency.threadnum * testnum / ((endtime - st.get()) / 1000_000.0) + " ops/ms");
 	}
 }
