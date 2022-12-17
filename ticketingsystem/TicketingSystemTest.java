@@ -73,7 +73,9 @@ class TicketingSystemTest {
 		assertNotNull(t);
 		remain = ds.inquiry(4, 1, 6);
 		assertEquals(COACHNUM * SEATNUM - 1, remain);
+		assertFalse(ds.refundTicket(new Ticket()));
 		assertTrue(ds.refundTicket(t));
+		assertFalse(ds.refundTicket(t));
 		remain = ds.inquiry(4, 1, 6);
 		assertEquals(COACHNUM * SEATNUM, remain);
 	}
@@ -374,5 +376,28 @@ class TicketingSystemTest {
 
 		t1 = lock.tryOptimisticRead();
 		assertNotEquals(0, t1);
+	}
+
+	// buyTicket
+	@Test
+	void StampedLockTest3() {
+		StampedLock lock = new StampedLock();
+		long t1 = lock.tryOptimisticRead();
+		long t2 = lock.writeLock();
+		assertTrue(t2 > 0);
+		lock.unlockWrite(t2);
+		t1 = lock.tryConvertToWriteLock(t1);
+		assertTrue(t1 == 0);
+	}
+
+	// inquiry
+	@Test
+	void StampedLockTest4() {
+		StampedLock lock = new StampedLock();
+		long t1 = lock.tryOptimisticRead();
+		long t2 = lock.readLock();
+		assertTrue(t2 > 0);
+		lock.unlockRead(t2);
+		assertTrue(lock.validate(t1));
 	}
 }

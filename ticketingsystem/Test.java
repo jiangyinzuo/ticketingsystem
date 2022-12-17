@@ -86,9 +86,9 @@ class Latency {
 	@Override
 	public String toString() {
 		return "count: " + count
-				+ ", avg latency: " + laplaceSmooth(latenciesSum / 1000000, count) + " ms"
-				+ ", max latency: " + maxLatency
-				+ ", min latency: " + minLatency
+				+ ", avg latency: " + laplaceSmooth(latenciesSum / 1000, count) + " us"
+				+ ", max latency: " + maxLatency + " ns"
+				+ ", min latency: " + minLatency + " ns"
 				+ ", QPS: " + laplaceSmooth(count, latenciesSum / 1000000) * threadnum + " ops/ms";
 	}
 
@@ -149,11 +149,11 @@ public class Test {
 				final Random rand = new Random(Thread.currentThread().getId() * 1000000007L + System.currentTimeMillis());
 				final HashSet<Ticket> tickets = new HashSet<>(testnum * ConfigReader.buyRatio);
 				try {
-					st.set(System.nanoTime());
 					barrier.await();
 				} catch (InterruptedException | BrokenBarrierException e) {
 					e.printStackTrace();
 				}
+				st.compareAndSet(0, System.nanoTime());
 				for (int op = 0; op < testnum; ++op) {
 					int randvalue = rand.nextInt(100);
 					if (randvalue < ConfigReader.refRatio && !tickets.isEmpty()) {
@@ -196,7 +196,7 @@ public class Test {
 						metrics2.inquiryLatency.report(System.nanoTime() - startTime);
 					}
 				}
-				System.out.println("t" + Thread.currentThread().getId() + " done");
+				// System.out.println("t" + Thread.currentThread().getId() + " done");
 			});
 			threads[i].start();
 		}

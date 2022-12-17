@@ -1,0 +1,36 @@
+{
+	// 使用 IntelliSense 了解相关属性。 
+	// 悬停以查看现有属性的描述。
+	// 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "java",
+			"name": "Launch Current File",
+			"request": "launch",
+			"mainClass": "${file}"
+		},
+		{
+			"type": "java",
+			"name": "Launch GenerateHistory",
+			"request": "launch",
+			"mainClass": "ticketingsystem.GenerateHistory",
+			"projectName": "myproject_67ba2d72",
+			"args": "4 ../history 1 ../failedHistory"
+		},
+		{
+			"type": "java",
+			"name": "Launch Replay",
+			"request": "launch",
+			"mainClass": "ticketingsystem.Replay",
+			"projectName": "myproject_67ba2d72"
+		},
+		{
+			"type": "java",
+			"name": "Launch Test",
+			"request": "launch",
+			"mainClass": "ticketingsystem.Test",
+			"projectName": "myproject_67ba2d72"
+		}
+	]
+}

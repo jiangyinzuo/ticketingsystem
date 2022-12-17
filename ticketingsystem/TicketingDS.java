@@ -9,6 +9,7 @@ import java.util.concurrent.locks.StampedLock;
 import sun.misc.Unsafe;
 
 public class TicketingDS implements TicketingSystem {
+	private static final Object dummyObject = new Object();
 
 	// @sun.misc.Contended
 	static final class ContendedCell {
@@ -71,7 +72,8 @@ public class TicketingDS implements TicketingSystem {
 	}
 
 	class RouteTickets {
-		private final LockedCell[][] rangeSeatNums;
+		// [departure][arrival]
+		private final LockedCell[][] stations;
 		// [coach][seat]
 		private final AtomicLong[][] gapLocks;
 
@@ -84,17 +86,17 @@ public class TicketingDS implements TicketingSystem {
 		}
 
 		RouteTickets() {
-			this.rangeSeatNums = new LockedCell[stationnum + 1][stationnum + 1];
+			this.stations = new LockedCell[stationnum + 1][stationnum + 1];
 			this.gapLocks = new AtomicLong[coachnum + 1][seatnum + 1];
 
 			for (int i = 1; i <= stationnum; ++i) {
 				for (int j = 1; j <= stationnum; ++j) {
-					this.rangeSeatNums[i][j] = new LockedCell();
+					this.stations[i][j] = new LockedCell();
 				}
 			}
 			for (int coach = 1; coach <= coachnum; ++coach) {
 				for (int seat = 1; seat <= seatnum; ++seat) {
-					this.rangeSeatNums[1][stationnum].ticketsOnSale.add(new TicketSale(coach, seat));
+					this.stations[1][stationnum].ticketsOnSale.add(new TicketSale(coach, seat));
 					this.gapLocks[coach][seat] = new AtomicLong(0);
 				}
 			}
@@ -117,7 +119,7 @@ public class TicketingDS implements TicketingSystem {
 		}
 
 		private TicketSale allocCoachSeatWithRange(String passenger, int departure, int arrival, int left, int right) {
-			LockedCell oldCell = rangeSeatNums[left][right];
+			LockedCell oldCell = stations[left][right];
 			for (;;) {
 				long rs = oldCell.rwlock.tryOptimisticRead();
 				if (rs == 0) {
@@ -132,8 +134,8 @@ public class TicketingDS implements TicketingSystem {
 					}
 					TicketSale oldTicketOnSale = oldCell.ticketsOnSale.iterator().next();
 					oldCell.ticketsOnSale.remove(oldTicketOnSale);
-					LockedCell[] cells = { rangeSeatNums[left][departure],
-							rangeSeatNums[arrival][right] };
+					LockedCell[] cells = { stations[left][departure],
+							stations[arrival][right] };
 					long[] wts = { 0, 0 };
 
 					TicketSale newTicketSale = new TicketSale(genTid(), passenger, oldTicketOnSale.coach, oldTicketOnSale.seat);
@@ -161,7 +163,7 @@ public class TicketingDS implements TicketingSystem {
 							cells[i].rwlock.unlockWrite(wts[i]);
 						}
 					}
-					rangeSeatNums[departure][arrival].soldTickets.put(newTicketSale, new Object());
+					stations[departure][arrival].soldTickets.put(newTicketSale, dummyObject);
 
 					return newTicketSale;
 				} else {
@@ -171,7 +173,7 @@ public class TicketingDS implements TicketingSystem {
 		}
 
 		boolean freeCoachSeat(Ticket ticket) {
-			LockedCell cell = rangeSeatNums[ticket.departure][ticket.arrival];
+			LockedCell cell = stations[ticket.departure][ticket.arrival];
 			TicketSale soldTicketSale = new TicketSale(ticket);
 			if (cell.soldTickets.remove(soldTicketSale) == null) {
 				return false;
@@ -192,8 +194,8 @@ public class TicketingDS implements TicketingSystem {
 					++right;
 				}
 
-				LockedCell[] cells = { rangeSeatNums[left][right], rangeSeatNums[left][ticket.departure],
-						rangeSeatNums[ticket.arrival][right] };
+				LockedCell[] cells = { stations[left][right], stations[left][ticket.departure],
+						stations[ticket.arrival][right] };
 				long[] wts = { 0, 0, 0 };
 				wts[0] = cells[0].rwlock.writeLock();
 				if (left < ticket.departure) {
@@ -235,7 +237,7 @@ public class TicketingDS implements TicketingSystem {
 			int lockCount = 0;
 			for (int left = 1; left <= departure; ++left) {
 				for (int right = stationnum; right >= arrival; --right) {
-					LockedCell cell = rangeSeatNums[left][right];
+					LockedCell cell = stations[left][right];
 					long rt = cell.rwlock.tryOptimisticRead();
 					if (rt > 0) {
 						int sz = cell.ticketsOnSale.size();

@@ -3,5 +3,5 @@
 1 2 0 buyTicket 3 passenger1 1 1 1 5 3 true
 3 4 0 inquiry 0 passenger1 1 0 1 5 12 true
 5 6 0 refundTicket 1 passenger1 1 1 1 5 1 true
-7 8 0 buyTicket 4 passenger1 1 1 1 5 4 true
-5 200 0 inquiry 0 passenger1 1 0 1 5 11 true
+7 8 1 buyTicket 4 passenger1 1 1 1 5 4 true
+5 200 2 inquiry 0 passenger1 1 0 1 5 11 true
