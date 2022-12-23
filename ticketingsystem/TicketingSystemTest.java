@@ -105,36 +105,33 @@ class TicketingSystemTest {
 
 	@Test
 	void historyTest() {
-		File dir = new File("");
-		try {
-			System.out.println(dir.getCanonicalPath());
-		} catch (IOException e) {
-			e.printStackTrace();
+		for (int h = 3; h <= 3; ++h) {
+			ArrayList<HistoryLine> historys = new ArrayList<>();
+			String filename = "/pub/home/user042/myproject/ticketingsystem/testfile/failedHistory4" ;
+			Replay.readHistory(historys, filename);
+			assertTrue(!historys.isEmpty());
+			Config cfg = new Config(1, 3, 5, 5);
+			HashMap<Integer, Integer> inquiry = caculateInquiryResult(cfg, historys);
+			replayHistoryLine(cfg, historys, inquiry);
 		}
-		ArrayList<HistoryLine> historys = new ArrayList<>();
-		Replay.readHistory(historys, "/pub/home/user042/myproject/ticketingsystem/testfile/history1");
-		assertTrue(!historys.isEmpty());
-		Config cfg = new Config(3, 3, 5, 5);
-		HashMap<Integer, Integer> inquiry = caculateInquiryResult(cfg, historys);
-		replayHistoryLine(cfg, historys, inquiry);
 	}
 
 	private HashMap<Integer, Integer> caculateInquiryResult(
 			Config cfg,
 			ArrayList<HistoryLine> historyLines) {
 		HashMap<Integer, Integer> result = new HashMap<>();
-		boolean[][][] stations = new boolean[cfg.coachnum + 1][cfg.seatnum + 1][cfg.stationnum + 1];
+		boolean[][][][] stations = new boolean[cfg.routenum + 1][cfg.coachnum + 1][cfg.seatnum + 1][cfg.stationnum + 1];
 		int line = 0;
 		for (HistoryLine historyLine : historyLines) {
 			switch (historyLine.operationName) {
 				case "buyTicket":
 					for (int station = historyLine.departure + 1; station <= historyLine.arrival; ++station) {
-						stations[historyLine.coach][historyLine.seat][station] = true;
+						stations[historyLine.route][historyLine.coach][historyLine.seat][station] = true;
 					}
 					break;
 				case "refundTicket":
 					for (int station = historyLine.departure + 1; station <= historyLine.arrival; ++station) {
-						stations[historyLine.coach][historyLine.seat][station] = false;
+						stations[historyLine.route][historyLine.coach][historyLine.seat][station] = false;
 					}
 					break;
 				case "inquiry":
@@ -143,7 +140,7 @@ class TicketingSystemTest {
 						for (int seat = 1; seat <= cfg.seatnum; ++seat) {
 							boolean exclude = false;
 							for (int station = historyLine.departure + 1; station <= historyLine.arrival; ++station) {
-								exclude |= stations[coach][seat][station];
+								exclude |= stations[historyLine.route][coach][seat][station];
 								if (exclude) {
 									break;
 								}
@@ -153,6 +150,8 @@ class TicketingSystemTest {
 							}
 						}
 					}
+					System.out.println(line);
+					assertEquals(sum, historyLine.seat);
 					result.put(line, sum);
 					break;
 				default:
